@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Control de Asistencia</title>
+  <link rel="stylesheet" href="CSS/style.css">
+</head>
+<body>
+
+<div class="app">
+
+  <!-- LOGIN -->
+  <section id="screen-login" class="screen active">
+    <div class="card login-card">
+      <div class="login-image-wrapper">
+        <img id="login-image" src="" alt="Imagen Kessa" />
+        <div class="img-actions">
+          <label class="btn small ghost">Cambiar imagen
+            <input id="img-file" type="file" accept="image/*" style="display:none">
+          </label>
+          <button class="btn small ghost" id="reset-image">Quitar</button>
+        </div>
+      </div>
+
+      <h1>Iniciar sesión</h1>
+      <input id="input-pass" type="password" placeholder="Contraseña" class="big-input">
+      <button class="btn big" id="btn-login">Entrar</button>
+      <p id="login-msg" class="msg error"></p>
+    </div>
+  </section>
+
+  <!-- MENU -->
+  <section id="screen-menu" class="screen">
+    <div class="card">
+      <h1>Menú principal</h1>
+      <div class="stack">
+        <button class="btn" id="btn-register">Registrar asistencia</button>
+        <button class="btn" id="btn-new">Registrar/Editar empleados</button>
+        <button class="btn" id="btn-salary">Ver salarios</button>
+        <button class="btn" id="btn-aguinaldo">Aguinaldo</button>
+      </div>
+      <div style="margin-top:10px;">
+        <button class="btn ghost" id="btn-change-pass">Cambiar contraseña</button>
+        <button class="btn ghost" id="btn-logout">Cerrar sesión</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- REGISTER ASSISTANCE -->
+  <section id="screen-register" class="screen">
+    <div class="card">
+      <h1>Registrar asistencia — Semana actual</h1>
+      <p class="muted">Selecciona empleado, luego el día (Lunes → Domingo). Domingo es día de descanso: si trabajan se paga extra; si no registran no cuenta como falta.</p>
+
+      <div id="employees-list" class="employees-list"></div>
+
+      <div id="days-area" class="days-area"></div>
+
+      <div style="margin-top:12px;">
+        <button class="btn ghost" id="btn-back-menu-1">Regresar al menú</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- NEW / EDIT EMPLOYEES -->
+  <section id="screen-new" class="screen">
+    <div class="card">
+      <h1>Empleados (Agregar / Editar)</h1>
+
+      <div id="emps-table"></div>
+
+      <hr style="margin:14px 0">
+
+      <h3>Agregar nuevo empleado</h3>
+      <input id="new-fullname" placeholder="Nombre completo">
+      <input id="new-alias" placeholder="Alias (único)">
+      <label>Fecha inicio</label>
+      <input id="new-start" type="date">
+      <label>Salario semanal</label>
+      <input id="new-weekly" type="number" min="0" placeholder="1500">
+
+      <label>Foto del empleado (opcional)</label>
+      <input id="new-photo" type="file" accept="image/*">
+
+      <div style="margin-top:8px;">
+        <button class="btn" id="btn-save-emp">Guardar</button>
+        <button class="btn ghost" id="btn-back-menu-2">Regresar al menú</button>
+      </div>
+
+      <p id="new-msg" class="msg"></p>
+    </div>
+  </section>
+
+  <!-- SALARIES -->
+  <section id="screen-salary" class="screen">
+    <div class="card">
+      <h1>Ver salarios</h1>
+
+      <div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <select id="periodSelect">
+          <option value="week">Semanal (semana actual)</option>
+          <option value="month">Mensual</option>
+          <option value="year">Anual</option>
+          <option value="day">Diario (día específico)</option>
+        </select>
+
+        <!-- Dropdowns: día / mes / año -->
+        <select id="daySelect" style="display:none"></select>
+        <select id="monthSelect" style="display:none"></select>
+        <select id="yearSelect" style="display:none"></select>
+
+        <button class="btn small" id="btn-refresh-salary">Cargar</button>
+        <button class="btn small ghost" id="btn-export-week-image" title="Exportar semana en imagen">Exportar semana (imagen)</button>
+        <button class="btn small ghost" id="btn-export-salary-image" title="Exportar hoja de salarios">Exportar hoja salarios (imagen)</button>
+      </div>
+
+      <div id="salary-results" style="margin-top:12px"></div>
+
+      <div style="margin-top:12px;">
+        <button class="btn ghost" id="btn-back-menu-3">Regresar al menú</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- AGUINALDO -->
+  <section id="screen-aguinaldo" class="screen">
+    <div class="card">
+      <h1>Aguinaldo anual (estimado)</h1>
+      <p class="muted">Calculado proporcionalmente según días trabajados en el año</p>
+
+      <div id="aguinaldo-results"></div>
+
+      <div style="margin-top:12px;">
+        <button class="btn ghost" id="btn-back-menu-4">Regresar al menú</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- MODAL: register / edit attendance -->
+  <div id="modal" class="modal hidden">
+    <div class="modal-card">
+      <h2 id="modal-title">Registrar horas</h2>
+      <p id="modal-sub" class="muted"></p>
+
+      <label>Hora de entrada</label>
+      <input id="modal-entry" type="time">
+
+      <label>Hora de salida</label>
+      <input id="modal-exit" type="time">
+
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn" id="modal-save">Guardar</button>
+        <button class="btn ghost" id="modal-cancel">Cancelar</button>
+      </div>
+
+      <p id="modal-note" class="muted" style="margin-top:8px;"></p>
+    </div>
+  </div>
+
+  <!-- EDIT RECORD MODAL -->
+  <div id="edit-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Editar registro</h2>
+      <p id="edit-sub" class="muted"></p>
+
+      <label>Entrada</label><input id="edit-entry" type="time">
+      <label>Salida</label><input id="edit-exit" type="time">
+
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn" id="edit-save">Guardar</button>
+        <button class="btn ghost" id="edit-cancel">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- CHANGE PASSWORD PROMPT -->
+  <div id="pass-modal" class="modal hidden">
+    <div class="modal-card">
+      <h2>Cambiar contraseña</h2>
+      <input id="new-pass" placeholder="Nueva contraseña">
+      <div style="display:flex;gap:8px;margin-top:12px;">
+        <button class="btn" id="save-pass">Guardar</button>
+        <button class="btn ghost" id="cancel-pass">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script src="JS/main.js"></script>
+</body>
+</html>
