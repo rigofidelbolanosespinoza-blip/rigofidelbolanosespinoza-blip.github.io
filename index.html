@@ -1,196 +1,864 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-  <meta charset="utf-8"/>
-  <meta name="viewport" content="width=device-width,initial-scale=1"/>
-  <title>Control de Asistencia</title>
-  <link rel="stylesheet" href="CSS/style.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rutero KESAA - Sistema de Control</title>
+    
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+    <style>
+        :root {
+            --kesaa-rojo: #d32f2f;
+            --kesaa-rojo-claro: #ffdde0;
+            --status-amarillo: #fbc02d;
+            --status-verde: #388e3c;
+            --status-naranja: #f57c00;
+            --status-rojo: #cc1e1e;
+            --bg-gris: #f4f6f9;
+            --texto-oscuro: #333333;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-gris); color: var(--texto-oscuro);
+        }
+
+        /* --- NAVBAR --- */
+        .navbar {
+            display: none; /* Se muestra solo al iniciar sesión */
+            background: linear-gradient(135deg, #b71c1c, var(--kesaa-rojo));
+            color: white; height: 60px; align-items: center; justify-content: space-between;
+            padding: 0 24px; box-shadow: 0 2px 10px rgba(0,0,0,0.15); z-index: 2000; position: relative;
+        }
+        .navbar .brand { font-size: 22px; font-weight: bold; display: flex; align-items: center; gap: 8px; }
+        .navbar .date-display { font-size: 14px; opacity: 0.95; font-weight: 500; }
+
+        /* --- PANTALLA DE LOGIN --- */
+        .login-screen {
+            display: flex; justify-content: center; align-items: center;
+            height: 100vh; width: 100vw; background: linear-gradient(135deg, #b71c1c, #330000);
+        }
+        .login-box {
+            background: white; padding: 40px; border-radius: 16px; width: 100%; max-width: 360px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3); text-align: center;
+        }
+        .login-box h2 { margin: 0 0 10px 0; color: var(--kesaa-rojo); font-size: 24px; }
+        .login-box p { color: #666; font-size: 14px; margin-bottom: 25px; }
+        .login-input {
+            width: 100%; padding: 12px; border: 1px solid #ccc; border-radius: 8px;
+            box-sizing: border-box; font-size: 16px; margin-bottom: 15px; text-align: center;
+        }
+        .btn-login {
+            width: 100%; padding: 12px; background: var(--kesaa-rojo); color: white;
+            border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+            transition: background 0.2s;
+        }
+        .btn-login:hover { background: #b71c1c; }
+        .login-error { color: var(--status-rojo); font-size: 13px; margin-top: 10px; font-weight: bold; }
+
+        /* --- CONTENEDORES --- */
+        .app-container { padding: 24px; max-width: 1200px; margin: 0 auto; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+
+        /* --- VISTA: DASHBOARD --- */
+        .welcome-banner {
+            background: linear-gradient(135deg, #d32f2f, #e53935); color: white;
+            padding: 30px; border-radius: 16px; margin-bottom: 24px;
+            box-shadow: 0 4px 15px rgba(211, 47, 47, 0.25);
+        }
+        .welcome-banner h2 { margin: 0 0 8px 0; font-size: 28px; }
+        .welcome-banner p { margin: 0; opacity: 0.9; font-size: 15px; }
+
+        .menu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 24px; }
+        .menu-card {
+            background: white; border-radius: 14px; padding: 24px; text-align: center;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05); cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s; border: 1px solid #eef2f5;
+        }
+        .menu-card:hover { transform: translateY(-4px); box-shadow: 0 8px 15px rgba(0,0,0,0.1); }
+        .card-icon {
+            width: 55px; height: 55px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; margin: 0 auto 16px auto; font-size: 24px;
+        }
+        .icon-blue { background: #e3f2fd; color: #1e88e5; }
+        .icon-purple { background: #f3e5f5; color: #8e24aa; }
+        .icon-orange { background: #fff3e0; color: #fb8c00; }
+        .menu-card h3 { margin: 0 0 8px 0; font-size: 16px; color: #222; }
+        .menu-card p { margin: 0; font-size: 13px; color: #777; line-height: 1.4; }
+
+        /* Panel Resumen Diario */
+        .summary-panel { background: white; border-radius: 14px; padding: 24px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .summary-header-flex { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 10px; }
+        .summary-title { font-size: 16px; font-weight: bold; color: #444; }
+        .route-day-selector { padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: 600; background: #fafafa; color: #333; }
+
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 15px; }
+        .summary-box { background: var(--bg-gris); padding: 16px; border-radius: 10px; }
+        .summary-box .lbl { font-size: 12px; color: #777; text-transform: uppercase; font-weight: 600; margin-bottom: 6px; }
+        .summary-box .val { font-size: 22px; font-weight: bold; color: #222; }
+
+        .btn-pdf-action { background-color: #0288d1; color: white; border: none; width: 100%; padding: 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        .btn-pdf-action:hover { background-color: #01579b; }
+
+        /* --- SELECCIÓN DE RUTA --- */
+        .route-selection-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; margin-top: 20px; }
+        .route-select-card {
+            background: white; border-radius: 10px; padding: 20px; border-left: 5px solid var(--kesaa-rojo);
+            cursor: pointer; box-shadow: 0 2px 5px rgba(0,0,0,0.05); transition: background 0.2s;
+        }
+        .route-select-card:hover { background: #fafafa; }
+
+        /* --- VISTA TRABAJO MAPA --- */
+        .route-work-layout { display: flex; height: calc(100vh - 60px); width: 100%; overflow: hidden; }
+        .route-sidebar { width: 380px; background: white; display: flex; flex-direction: column; border-right: 1px solid #e0e6ed; }
+        .sidebar-header { padding: 12px 15px; border-bottom: 1px solid #e0e6ed; background: #fafafa; display: flex; flex-direction: column; gap: 10px; }
+        .sidebar-header-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+        
+        .btn-back { background: var(--kesaa-rojo); color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 13px; }
+
+        .search-container { width: 100%; box-sizing: border-box; }
+        .search-input { width: 100%; padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px; box-sizing: border-box; }
+        .toggle-filter-box { display: flex; background: #eee; border-radius: 6px; padding: 2px; gap: 2px; }
+        .toggle-btn { flex: 1; border: none; background: transparent; padding: 6px; font-size: 11px; font-weight: bold; border-radius: 4px; cursor: pointer; }
+        .toggle-btn.active { background: white; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+
+        /* Formulario Semáforo */
+        .form-pop-container { padding: 15px 20px; background: #fffcf5; border-bottom: 1px solid #e0e6ed; display: none; }
+        .form-pop-container h4 { margin: 0 0 10px 0; font-size: 14px; color: var(--kesaa-rojo); }
+        .input-item { margin-bottom: 8px; }
+        .input-item label { display: block; font-size: 11px; font-weight: bold; margin-bottom: 3px; color: #555; }
+        .input-item input, .input-item select { width: 100%; padding: 7px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; font-size: 13px; }
+        .btn-group-form { display: flex; gap: 8px; margin-top: 10px; }
+        .btn-save-form { flex: 1; background: var(--status-verde); color: white; border: none; padding: 8px; border-radius: 4px; font-weight: bold; cursor: pointer; }
+        .btn-cancel-form { background: #757575; color: white; border: none; padding: 8px; border-radius: 4px; cursor: pointer; }
+
+        .route-list-stores { flex: 1; overflow-y: auto; padding: 10px; background: #fdfdfd; }
+        .store-row-card {
+            background: white; border: 1px solid #e8edf2; border-radius: 8px; padding: 14px 12px;
+            margin-bottom: 8px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+            transition: background 0.15s;
+        }
+        .store-row-card:hover { background: #f8fafc; }
+        .store-info-side { display: flex; flex-direction: column; gap: 3px; max-width: 85%; }
+        .store-name-text { font-weight: bold; font-size: 13px; color: #222; }
+        .store-desc-text { font-size: 11px; color: #666; }
+        .store-actions-side { display: flex; align-items: center; }
+
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+        .dot-amarillo { background-color: var(--status-amarillo); }
+        .dot-verde { background-color: var(--status-verde); }
+        .dot-naranja { background-color: var(--status-naranja); }
+        .dot-rojo { background-color: var(--status-rojo); }
+        #map-canvas { flex: 1; height: 100%; }
+
+        /* --- SECCIÓN ADMINISTRAR TIENDAS --- */
+        .generic-form-box { background: white; padding: 24px; border-radius: 14px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); margin-top: 15px; }
+        .form-title { font-size: 18px; font-weight: bold; margin-bottom: 15px; color: var(--kesaa-rojo); border-bottom: 1px solid #eee; padding-bottom: 8px; }
+        
+        .admin-layout-split { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px; }
+        #admin-map-canvas { width: 100%; height: 350px; border-radius: 8px; border: 1px solid #ccc; }
+
+        .edit-stores-table { width: 100%; border-collapse: collapse; }
+        .edit-stores-table th, .edit-stores-table td { padding: 10px; border-bottom: 1px solid #eee; text-align: left; font-size: 13px; }
+        .edit-stores-table th { background: #f8fafc; font-weight: bold; }
+        .btn-delete-store { background: var(--status-rojo); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 12px; }
+
+        @media(max-width: 768px) {
+            .menu-grid, .summary-grid, .admin-layout-split { grid-template-columns: 1fr; }
+            .route-work-layout { flex-direction: column-reverse; }
+            .route-sidebar { width: 100%; height: 50%; }
+            #map-canvas { height: 50%; }
+        }
+    </style>
 </head>
 <body>
 
-<div class="app">
-
-  <!-- LOGIN -->
-  <section id="screen-login" class="screen active">
-    <div class="card login-card">
-      <div class="login-image-wrapper">
-        <img id="login-image" src="" alt="Imagen Kessa" />
-        <div class="img-actions">
-          <label class="btn small ghost">Cambiar imagen
-            <input id="img-file" type="file" accept="image/*" style="display:none">
-          </label>
-          <button class="btn small ghost" id="reset-image">Quitar</button>
+    <div id="view-login" class="login-screen active">
+        <div class="login-box">
+            <h2>🔑 Control KESAA</h2>
+            <p>Ingresa la clave de acceso del sistema para continuar</p>
+            <input type="password" id="login-password" class="login-input" placeholder="Contraseña">
+            <button class="btn-login" onclick="evalLoginAccess()">Entrar al Sistema</button>
+            <div id="login-error" class="login-error"></div>
         </div>
-      </div>
-
-      <h1>Iniciar sesión</h1>
-      <input id="input-pass" type="password" placeholder="Contraseña" class="big-input">
-      <button class="btn big" id="btn-login">Entrar</button>
-      <p id="login-msg" class="msg error"></p>
     </div>
-  </section>
 
-  <!-- MENU -->
-  <section id="screen-menu" class="screen">
-    <div class="card">
-      <h1>Menú principal</h1>
-      <div class="stack">
-        <button class="btn" id="btn-register">Registrar asistencia</button>
-        <button class="btn" id="btn-new">Registrar/Editar empleados</button>
-        <button class="btn" id="btn-salary">Ver salarios</button>
-        <button class="btn" id="btn-aguinaldo">Aguinaldo</button>
-      </div>
-      <div style="margin-top:10px;">
-        <button class="btn ghost" id="btn-change-pass">Cambiar contraseña</button>
-        <button class="btn ghost" id="btn-logout">Cerrar sesión</button>
-      </div>
+    <div class="navbar" id="main-navbar">
+        <div class="brand">📌 Rutero KESAA</div>
+        <div class="date-display" id="live-date">lunes, 6 de julio de 2026</div>
     </div>
-  </section>
 
-  <!-- REGISTER ASSISTANCE -->
-  <section id="screen-register" class="screen">
-    <div class="card">
-      <h1>Registrar asistencia — Semana actual</h1>
-      <p class="muted">Selecciona empleado, luego el día (Lunes → Domingo). Domingo es día de descanso: si trabajan se paga extra; si no registran no cuenta como falta.</p>
+    <div id="view-dashboard" class="view-section">
+        <div class="app-container">
+            <div class="welcome-banner">
+                <h2>¡Hola, bienvenido de nuevo! 👋</h2>
+                <p>Panel Central Operativo de Rutas Kesaa. Control total en tiempo real.</p>
+            </div>
 
-      <div id="employees-list" class="employees-list"></div>
+            <div class="menu-grid">
+                <div class="menu-card" onclick="switchMainView('view-select-route')">
+                    <div class="card-icon icon-blue">🚚</div>
+                    <h3>Empezar Ruta Guardada</h3>
+                    <p>Inicia el viaje del día, despliega el mapa y marca visitas en los 4 colores.</p>
+                </div>
+                <div class="menu-card" onclick="switchMainView('view-create-route')">
+                    <div class="card-icon icon-purple">➕</div>
+                    <h3>Crear Nueva Ruta</h3>
+                    <p>Crea un nuevo itinerario base (ej. Ruta Lunes, Ruta Norte) para añadirle tiendas.</p>
+                </div>
+                <div class="menu-card" onclick="openAdminSection()">
+                    <div class="card-icon icon-orange">🏪</div>
+                    <h3>Administrar Tiendas</h3>
+                    <p>Agrega tiendas tocando directamente el mapa o elimina puntos de tus secuencias.</p>
+                </div>
+            </div>
 
-      <div id="days-area" class="days-area"></div>
-
-      <div style="margin-top:12px;">
-        <button class="btn ghost" id="btn-back-menu-1">Regresar al menú</button>
-      </div>
+            <div class="summary-panel">
+                <div class="summary-header-flex">
+                    <div class="summary-title">📊 Resumen de Rendimiento de la Ruta Seleccionada</div>
+                    <div>
+                        <label style="font-size:13px; font-weight:bold; margin-right:8px; color:#555;">Ruta del día:</label>
+                        <select id="dashboard-route-selector" class="route-day-selector" onchange="changeTodayActiveRoute(this.value)">
+                            </select>
+                    </div>
+                </div>
+                <div class="summary-grid">
+                    <div class="summary-box"><div class="lbl">Total Recaudado (Neto)</div><div class="val" id="sum-recaudado">$0.00</div></div>
+                    <div class="summary-box"><div class="lbl">Tiendas Totales</div><div class="val" id="sum-totales">0</div></div>
+                    <div class="summary-box"><div class="lbl">Tiendas Visitadas</div><div class="val" id="sum-visitadas" style="color:var(--status-verde)">0</div></div>
+                    <div class="summary-box"><div class="lbl">Tiendas Faltantes</div><div class="val" id="sum-faltantes" style="color:var(--kesaa-rojo)">0</div></div>
+                </div>
+                <button class="btn-pdf-action" onclick="generatePDFReportOnly()">📄 Descargar PDF de Balance</button>
+            </div>
+        </div>
     </div>
-  </section>
 
-  <!-- NEW / EDIT EMPLOYEES -->
-  <section id="screen-new" class="screen">
-    <div class="card">
-      <h1>Empleados (Agregar / Editar)</h1>
-
-      <div id="emps-table"></div>
-
-      <hr style="margin:14px 0">
-
-      <h3>Agregar nuevo empleado</h3>
-      <input id="new-fullname" placeholder="Nombre completo">
-      <input id="new-alias" placeholder="Alias (único)">
-      <label>Fecha inicio</label>
-      <input id="new-start" type="date">
-      <label>Salario semanal</label>
-      <input id="new-weekly" type="number" min="0" placeholder="1500">
-
-      <label>Foto del empleado (opcional)</label>
-      <input id="new-photo" type="file" accept="image/*">
-
-      <div style="margin-top:8px;">
-        <button class="btn" id="btn-save-emp">Guardar</button>
-        <button class="btn ghost" id="btn-back-menu-2">Regresar al menú</button>
-      </div>
-
-      <p id="new-msg" class="msg"></p>
+    <div id="view-select-route" class="view-section">
+        <div class="app-container">
+            <button class="btn-back" onclick="switchMainView('view-dashboard')">⬅ Volver</button>
+            <h3 style="margin-top:20px;">📂 Elige la Ruta que deseas Operar:</h3>
+            <div class="route-selection-list" id="render-select-list"></div>
+        </div>
     </div>
-  </section>
 
-  <!-- SALARIES -->
-  <section id="screen-salary" class="screen">
-    <div class="card">
-      <h1>Ver salarios</h1>
-
-      <div class="filters" style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <select id="periodSelect">
-          <option value="week">Semanal (semana actual)</option>
-          <option value="month">Mensual</option>
-          <option value="year">Anual</option>
-          <option value="day">Diario (día específico)</option>
-        </select>
-
-        <!-- Dropdowns: día / mes / año -->
-        <select id="daySelect" style="display:none"></select>
-        <select id="monthSelect" style="display:none"></select>
-        <select id="yearSelect" style="display:none"></select>
-
-        <button class="btn small" id="btn-refresh-salary">Cargar</button>
-        <button class="btn small ghost" id="btn-export-week-image" title="Exportar semana en imagen">Exportar semana (imagen)</button>
-        <button class="btn small ghost" id="btn-export-salary-image" title="Exportar hoja de salarios">Exportar hoja salarios (imagen)</button>
-      </div>
-
-      <div id="salary-results" style="margin-top:12px"></div>
-
-      <div style="margin-top:12px;">
-        <button class="btn ghost" id="btn-back-menu-3">Regresar al menú</button>
-      </div>
+    <div id="view-create-route" class="view-section">
+        <div class="app-container">
+            <button class="btn-back" onclick="switchMainView('view-dashboard')">⬅ Cancelar</button>
+            <div class="generic-form-box">
+                <div class="form-title">🆕 Crear Nueva Ruta Base</div>
+                <div class="input-item">
+                    <label>Nombre de la Ruta (ej. Ruta Lunes / Peribán):</label>
+                    <input type="text" id="new-route-name" placeholder="Ej. Ruta Lunes - Peribán Centro">
+                </div>
+                <button class="btn-save-form" style="background:var(--kesaa-rojo); margin-top:10px;" onclick="saveNewRouteHeader()">Crear e ir a añadir tiendas</button>
+            </div>
+        </div>
     </div>
-  </section>
 
-  <!-- AGUINALDO -->
-  <section id="screen-aguinaldo" class="screen">
-    <div class="card">
-      <h1>Aguinaldo anual (estimado)</h1>
-      <p class="muted">Calculado proporcionalmente según días trabajados en el año</p>
+    <div id="view-admin-stores" class="view-section">
+        <div class="app-container">
+            <button class="btn-back" onclick="switchMainView('view-dashboard')">⬅ Volver al Inicio</button>
+            
+            <div class="generic-form-box">
+                <div class="form-title">🛠️ Administrador de Puntos en Mapa</div>
+                <div class="input-item" style="max-width:400px;">
+                    <label>Selecciona la ruta a editar:</label>
+                    <select id="admin-route-selector" onchange="loadRouteStoresToAdminSection()">
+                        </select>
+                </div>
 
-      <div id="aguinaldo-results"></div>
+                <div class="admin-layout-split">
+                    <div>
+                        <div style="background: #fff8f8; padding:12px; border-radius:6px; margin-bottom:15px; border-left:4px solid var(--kesaa-rojo);">
+                            <span style="font-size:12px; font-weight:bold; color:var(--kesaa-rojo);">💡 ¿CÓMO AGREGAR TIENDAS?</span><br>
+                            <span style="font-size:12px; color:#555;">Haz click en el mapa de la derecha, pon el nombre del establecimiento y presiona Guardar.</span>
+                        </div>
+                        
+                        <div style="background:#f9f9f9; padding:15px; border-radius:8px; border:1px dashed #ccc; margin-bottom:15px;">
+                            <b style="font-size:14px; color:#333; display:block; margin-bottom:10px;">➕ Nueva Tienda Seleccionada:</b>
+                            <div class="input-item"><label>Nombre del Establecimiento:</label><input type="text" id="add-store-name" placeholder="Ej. Tienda Doña Mari"></div>
+                            <div style="display:flex; gap:10px;">
+                                <div class="input-item" style="flex:1;"><label>Latitud:</label><input type="number" step="any" id="add-store-lat" readonly style="background:#eee;"></div>
+                                <div class="input-item" style="flex:1;"><label>Longitud:</label><input type="number" step="any" id="add-store-lon" readonly style="background:#eee;"></div>
+                            </div>
+                            <button class="btn-save-form" style="width:100%;" onclick="addStoreToActiveAdminRoute()">Guardar Punto en la Ruta</button>
+                        </div>
 
-      <div style="margin-top:12px;">
-        <button class="btn ghost" id="btn-back-menu-4">Regresar al menú</button>
-      </div>
+                        <b style="font-size:14px; display:block; margin-bottom:8px;">📋 Tiendas en esta Ruta:</b>
+                        <div style="max-height: 200px; overflow-y:auto; border:1px solid #eee;">
+                            <table class="edit-stores-table">
+                                <thead><tr><th>Nombre</th><th>Acción</th></tr></thead>
+                                <tbody id="admin-table-body"></tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div>
+                        <div id="admin-map-canvas"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </section>
 
-  <!-- MODAL: register / edit attendance -->
-  <div id="modal" class="modal hidden">
-    <div class="modal-card">
-      <h2 id="modal-title">Registrar horas</h2>
-      <p id="modal-sub" class="muted"></p>
+    <div id="view-route-work" class="view-section">
+        <div class="route-work-layout">
+            <div class="route-sidebar">
+                <div class="sidebar-header">
+                    <div class="sidebar-header-top">
+                        <b style="font-size:13px;" id="work-route-title">Ruta: Activa</b>
+                        <button class="btn-back" onclick="switchMainView('view-dashboard')">⬅ Salir</button>
+                    </div>
+                    <div class="search-container">
+                        <input type="text" id="store-search-input" class="search-input" placeholder="🔍 Buscar por nombre de tienda..." oninput="buildInteractiveRouteMap()">
+                    </div>
+                    <div class="toggle-filter-box">
+                        <button id="filter-all-btn" class="toggle-btn active" onclick="changeMapVisFilter('all')">Ver Todas</button>
+                        <button id="filter-pending-btn" class="toggle-btn" onclick="changeMapVisFilter('pending')">Solo Pendientes 🟡</button>
+                    </div>
+                </div>
 
-      <label>Hora de entrada</label>
-      <input id="modal-entry" type="time">
+                <div class="form-pop-container" id="form-registro-visita">
+                    <h4 id="form-tienda-titulo">Registrar Tienda</h4>
+                    <div class="input-item">
+                        <label>Estatus / Semáforo:</label>
+                        <select id="field-status" onchange="toggleFormInputs()">
+                            <option value="amarillo">🟡 Aún no se pasa (Pendiente)</option>
+                            <option value="verde">🟢 Ya se pasó y SÍ dejaron producto</option>
+                            <option value="naranja">🟠 Pasamos y NO dejaron producto</option>
+                            <option value="rojo">🔴 No dejaron / Incidencia</option>
+                        </select>
+                    </div>
+                    
+                    <div id="extended-fields">
+                        <div class="input-item"><label>¿Qué se llevó en producto?</label><input type="text" id="field-producto" placeholder="Ej. 2 rejas Sabritas"></div>
+                        <div class="input-item"><label>Precio / Total Vendido Bruto ($):</label><input type="number" id="field-precio" placeholder="Ej. 180" oninput="liveCalculateNeto()"></div>
+                        <div style="display: flex; gap: 10px;">
+                            <div class="input-item" style="flex: 1;"><label>Merma (Piezas):</label><input type="number" id="field-merma-piezas" placeholder="0"></div>
+                            <div class="input-item" style="flex: 1;"><label>Merma ($ Pasivo):</label><input type="number" id="field-merma-dinero" placeholder="0" oninput="liveCalculateNeto()"></div>
+                        </div>
+                        <div id="neto-live-preview" style="font-size: 12px; color: var(--status-verde); font-weight: bold; margin-top: 5px; margin-bottom: 5px;">Total Neto: $0.00</div>
+                    </div>
+                    
+                    <div class="btn-group-form">
+                        <button class="btn-save-form" onclick="saveStoreStatus()">Guardar Estado</button>
+                        <button class="btn-cancel-form" onclick="closeFormPanel()">Cerrar</button>
+                    </div>
+                </div>
 
-      <label>Hora de salida</label>
-      <input id="modal-exit" type="time">
-
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn" id="modal-save">Guardar</button>
-        <button class="btn ghost" id="modal-cancel">Cancelar</button>
-      </div>
-
-      <p id="modal-note" class="muted" style="margin-top:8px;"></p>
+                <div class="route-list-stores" id="box-lista-tiendas"></div>
+            </div>
+            <div id="map-canvas"></div>
+        </div>
     </div>
-  </div>
 
-  <!-- EDIT RECORD MODAL -->
-  <div id="edit-modal" class="modal hidden">
-    <div class="modal-card">
-      <h2>Editar registro</h2>
-      <p id="edit-sub" class="muted"></p>
+    <script>
+        // Coordenadas de la Ruta de Peribán original
+        const peribanRawCoords = [
+            [19.524586, -102.414711], [19.523829, -102.416908], [19.522449, -102.416992],
+            [19.522070, -102.417549], [19.523746, -102.419327], [19.520931, -102.419205],
+            [19.519705, -102.417480], [19.517895, -102.412071], [19.527519, -102.422142],
+            [19.526703, -102.424438], [19.525440, -102.421432], [19.522043, -102.423187],
+            [19.522682, -102.425995], [19.520468, -102.419846], [19.518467, -102.416840],
+            [19.516859, -102.413208], [19.530499, -102.413116], [19.530226, -102.412498],
+            [19.523491, -102.413017], [19.518888, -102.414330], [19.517529, -102.414749],
+            [19.517410, -102.410416], [19.518757, -102.409882], [19.520273, -102.409264],
+            [19.520342, -102.407852], [19.520296, -102.404938], [19.520220, -102.404472],
+            [19.519897, -102.403191], [19.519243, -102.400536], [19.517342, -102.389977],
+            [19.513895, -102.394485], [19.518242, -102.409103], [19.519506, -102.412521],
+            [19.519844, -102.412437]
+        ];
 
-      <label>Entrada</label><input id="edit-entry" type="time">
-      <label>Salida</label><input id="edit-exit" type="time">
+        let coreRutas = JSON.parse(localStorage.getItem('kesaa_multiroute_db6'));
+        let selectedRouteToday = localStorage.getItem('kesaa_selected_route_today') || 'ruta_periban';
+        let currentVisFilter = 'all';
 
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn" id="edit-save">Guardar</button>
-        <button class="btn ghost" id="edit-cancel">Cancelar</button>
-      </div>
-    </div>
-  </div>
+        if (!coreRutas) {
+            coreRutas = {
+                "ruta_periban": {
+                    id: "ruta_periban",
+                    nombre: "Ruta Peribán (Original)",
+                    tiendas: peribanRawCoords.map((c, i) => ({
+                        id: i, nombre: `Tiendita Peribán #${i + 1}`, lat: c[0], lon: c[1], status: 'amarillo', producto: '', precio: 0, mermaPiezas: 0, mermaDinero: 0
+                    }))
+                }
+            };
+            localStorage.setItem('kesaa_multiroute_db6', JSON.stringify(coreRutas));
+        }
 
-  <!-- TOAST -->
-  <div id="toast" class="toast hidden"></div>
+        let map = null;
+        let adminMap = null;
+        let adminTempMarker = null;
+        let adminRouteMarkers = [];
+        let currentRouteKey = null;
+        let currentStoreId = null;
+        let markersArray = [];
+        
+        // Variables para Geolocalización en tiempo real
+        let userLocationMarker = null;
+        let gpsWatchId = null;
 
-  <!-- CHANGE PASSWORD PROMPT -->
-  <div id="pass-modal" class="modal hidden">
-    <div class="modal-card">
-      <h2>Cambiar contraseña</h2>
-      <input id="new-pass" placeholder="Nueva contraseña">
-      <div style="display:flex;gap:8px;margin-top:12px;">
-        <button class="btn" id="save-pass">Guardar</button>
-        <button class="btn ghost" id="cancel-pass">Cancelar</button>
-      </div>
-    </div>
-  </div>
+        // --- SISTEMA DE CONTROL DE LOGIN ---
+        function evalLoginAccess() {
+            const inputPass = document.getElementById('login-password').value;
+            if (inputPass === 'Nubecita2207') {
+                document.getElementById('view-login').style.display = 'none';
+                document.getElementById('main-navbar').style.display = 'flex';
+                switchMainView('view-dashboard');
+            } else {
+                document.getElementById('login-error').innerText = '❌ Acceso Denegado. Contraseña Incorrecta.';
+            }
+        }
 
-</div>
+        function switchMainView(viewId) {
+            document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+            document.getElementById(viewId).classList.add('active');
+            
+            // Si salimos del mapa de trabajo, apagamos el GPS en segundo plano para no gastar batería
+            if (viewId !== 'view-route-work' && gpsWatchId !== null) {
+                navigator.geolocation.clearWatch(gpsWatchId);
+                gpsWatchId = null;
+                if (userLocationMarker && map) { map.removeLayer(userLocationMarker); }
+                userLocationMarker = null;
+            }
 
-<script src="JS/main.js"></script>
+            if (viewId === 'view-dashboard') {
+                populateDashboardSelectors();
+                updateDashboardMetrics();
+            }
+            if (viewId === 'view-select-route') renderRouteSelectionList();
+        }
+
+        function changeMapVisFilter(type) {
+            currentVisFilter = type;
+            document.getElementById('filter-all-btn').classList.toggle('active', type === 'all');
+            document.getElementById('filter-pending-btn').classList.toggle('active', type === 'pending');
+            buildInteractiveRouteMap();
+        }
+
+        // --- RASTREO GPS EN TIEMPO REAL ---
+        function startTrackingUserLocation() {
+            if (navigator.geolocation) {
+                gpsWatchId = navigator.geolocation.watchPosition(function(position) {
+                    let lat = position.coords.latitude;
+                    let lon = position.coords.longitude;
+                    
+                    // Marcador distintivo azul brillante con borde blanco grueso para el rutero
+                    if (!userLocationMarker) {
+                        userLocationMarker = L.circleMarker([lat, lon], {
+                            radius: 10,
+                            fillColor: '#007bff',
+                            color: '#ffffff',
+                            weight: 3,
+                            opacity: 1,
+                            fillOpacity: 0.9
+                        }).addTo(map).bindPopup("<b>📍 Estás Aquí</b><br>Tu posición en tiempo real.");
+                    } else {
+                        userLocationMarker.setLatLng([lat, lon]);
+                    }
+                }, function(err) {
+                    console.warn("Aviso GPS: No se pudo obtener la ubicación exacta. Verifica los permisos.", err.message);
+                }, {
+                    enableHighAccuracy: true,
+                    maximumAge: 6000,
+                    timeout: 10000
+                });
+            } else {
+                console.error("Tu navegador o celular no soporta los servicios de ubicación (Geolocalización).");
+            }
+        }
+
+        // --- GENERADOR DE REPORTES EN PDF (DESCARGA DIRECTA) ---
+        function generatePDFReportOnly() {
+            let activeRoute = coreRutas[selectedRouteToday];
+            if (!activeRoute) return;
+
+            let totalBruto = 0;
+            let mermasPiezasTotales = 0;
+            let mermasDineroPasivo = 0;
+            let visitadas = 0;
+            let faltantes = 0;
+            let filasTablaTiendas = '';
+
+            activeRoute.tiendas.forEach(t => {
+                if (t.status === 'amarillo') {
+                    faltantes++;
+                } else {
+                    visitadas++;
+                }
+
+                let netoLocal = 0;
+                if(t.status === 'verde') {
+                    totalBruto += (t.precio || 0);
+                    mermasPiezasTotales += (t.mermaPiezas || 0);
+                    mermasDineroPasivo += (t.mermaDinero || 0);
+                    netoLocal = (t.precio || 0) - (t.mermaDinero || 0);
+                }
+
+                let statusTexto = t.status === 'amarillo' ? 'Pendiente 🟡' : (t.status === 'verde' ? 'SÍ Dejó 🟢' : (t.status === 'naranja' ? 'NO Dejó 🟠' : 'Incidencia 🔴'));
+
+                filasTablaTiendas += `
+                    <tr>
+                        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-size:12px;">${t.nombre}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-size:12px;">${statusTexto}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-size:12px;">$${(t.precio || 0).toFixed(2)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-size:12px;">${t.mermaPiezas || 0} pzs</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-size:12px;">$${(t.mermaDinero || 0).toFixed(2)}</td>
+                        <td style="padding: 8px; border-bottom: 1px solid #ddd; font-size:12px; font-weight:bold;">$${netoLocal.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+            let totalNetoGlobal = totalBruto - mermasDineroPasivo;
+
+            let pdfContainer = document.createElement('div');
+            pdfContainer.style.padding = '30px';
+            pdfContainer.style.fontFamily = 'Arial, sans-serif';
+            pdfContainer.innerHTML = `
+                <div style="border-bottom: 3px solid #d32f2f; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h1 style="margin: 0; color: #d32f2f; font-size: 26px;">📌 BALANCE DE RUTA KESAA</h1>
+                    <p style="margin: 5px 0 0 0; color: #555; font-size: 14px;">Reporte Oficial de Rendimiento Comercial</p>
+                </div>
+                
+                <table style="width: 100%; margin-bottom: 25px; font-size: 14px; background: #f9f9f9; padding: 15px; border-radius: 8px;">
+                    <tr><td><b>Ruta Evaluada:</b> ${activeRoute.nombre}</td><td><b>Fecha de Emisión:</b> ${new Date().toLocaleDateString('es-ES')}</td></tr>
+                    <tr><td><b>Tiendas Totales:</b> ${activeRoute.tiendas.length}</td><td><b>Estatus de Ruta:</b> ${visitadas} Visitadas / ${faltantes} Pendientes</td></tr>
+                </table>
+
+                <h3 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px;">📊 Resumen Financiero</h3>
+                <table style="width: 100%; border-collapse: collapse; margin-bottom: 30px; text-align: left;">
+                    <tr style="background: #f2f2f2;">
+                        <th style="padding: 10px; border: 1px solid #ddd;">Venta Bruta Total</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Total Mermas (Piezas)</th>
+                        <th style="padding: 10px; border: 1px solid #ddd;">Pérdida por Merma ($)</th>
+                        <th style="padding: 10px; border: 1px solid #ddd; background: #e8f5e9; color: #2e7d32;">RECAUDACIÓN NETO TOTAL</th>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-size: 16px;">$${totalBruto.toFixed(2)}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-size: 16px;">${mermasPiezasTotales} piezas</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-size: 16px; color: #c62828;">-$${mermasDineroPasivo.toFixed(2)}</td>
+                        <td style="padding: 10px; border: 1px solid #ddd; font-size: 18px; font-weight: bold; background: #e8f5e9; color: #2e7d32;">$${totalNetoGlobal.toFixed(2)}</td>
+                    </tr>
+                </table>
+
+                <h3 style="color: #333; border-bottom: 1px solid #ccc; padding-bottom: 5px;">📋 Desglose Individual de Tiendas</h3>
+                <table style="width: 100%; border-collapse: collapse; text-align: left;">
+                    <thead>
+                        <tr style="background: #d32f2f; color: white;">
+                            <th style="padding: 8px;">Establecimiento</th><th style="padding: 8px;">Visita</th>
+                            <th style="padding: 8px;">Venta Bruta</th><th style="padding: 8px;">Merma (Pz)</th>
+                            <th style="padding: 8px;">Merma ($)</th><th style="padding: 8px;">Total Neto</th>
+                        </tr>
+                    </thead>
+                    <tbody>${filasTablaTiendas}</tbody>
+                </table>
+            `;
+
+            let opcionesPDF = {
+                margin: 10,
+                filename: `Balance_Kesaa_${activeRoute.nombre.replace(/ /g, "_")}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2 },
+                jsPDF: { unit: 'mm', format: 'letter', orientation: 'portrait' }
+            };
+
+            // Descarga silenciosa y directa
+            html2pdf().from(pdfContainer).set(opcionesPDF).save();
+        }
+
+        // --- MANEJO CENTRAL DEL PANEL ---
+        function populateDashboardSelectors() {
+            const dSel = document.getElementById('dashboard-route-selector');
+            dSel.innerHTML = '';
+            Object.values(coreRutas).forEach(ruta => {
+                let opt = document.createElement('option');
+                opt.value = ruta.id; opt.innerText = ruta.nombre;
+                if(ruta.id === selectedRouteToday) opt.selected = true;
+                dSel.appendChild(opt);
+            });
+        }
+
+        function changeTodayActiveRoute(routeId) {
+            selectedRouteToday = routeId;
+            localStorage.setItem('kesaa_selected_route_today', routeId);
+            updateDashboardMetrics();
+        }
+
+        function updateDashboardMetrics() {
+            let totalCashNeto = 0;
+            let visitadas = 0;
+            let faltantes = 0;
+
+            let activeRoute = coreRutas[selectedRouteToday];
+            if (activeRoute) {
+                activeRoute.tiendas.forEach(t => {
+                    if (t.status === 'amarillo') {
+                        faltantes++;
+                    } else {
+                        visitadas++;
+                        if (t.status === 'verde') totalCashNeto += ((t.precio || 0) - (t.mermaDinero || 0));
+                    }
+                });
+                document.getElementById('sum-totales').innerText = activeRoute.tiendas.length;
+            } else {
+                document.getElementById('sum-totales').innerText = 0;
+            }
+
+            document.getElementById('sum-recaudado').innerText = `$${totalCashNeto.toFixed(2)}`;
+            document.getElementById('sum-visitadas').innerText = visitadas;
+            document.getElementById('sum-faltantes').innerText = faltantes;
+        }
+
+        function renderRouteSelectionList() {
+            const container = document.getElementById('render-select-list');
+            container.innerHTML = '';
+            Object.values(coreRutas).forEach(ruta => {
+                let card = document.createElement('div');
+                card.className = 'route-select-card';
+                card.onclick = () => startRouteMapExecution(ruta.id);
+                card.innerHTML = `<h3>📍 ${ruta.nombre}</h3><p>${ruta.tiendas.length} puntos registrados en cola.</p>`;
+                container.appendChild(card);
+            });
+        }
+
+        function startRouteMapExecution(routeKey) {
+            currentRouteKey = routeKey;
+            switchMainView('view-route-work');
+            document.getElementById('work-route-title').innerText = `Ruta: ${coreRutas[routeKey].nombre}`;
+
+            if (!map) {
+                setTimeout(() => {
+                    map = L.map('map-canvas');
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+                    buildInteractiveRouteMap();
+                    startTrackingUserLocation(); // Lanza rastreo en vivo al iniciar
+                }, 200);
+            } else {
+                setTimeout(() => { 
+                    map.invalidateSize(); 
+                    buildInteractiveRouteMap(); 
+                    startTrackingUserLocation(); 
+                }, 200);
+            }
+        }
+
+        function buildInteractiveRouteMap() {
+            // Limpieza de marcadores viejos
+            markersArray.forEach(m => map.removeLayer(m));
+            markersArray = [];
+
+            const listBox = document.getElementById('box-lista-tiendas');
+            listBox.innerHTML = '';
+            
+            let query = document.getElementById('store-search-input').value.toLowerCase().trim();
+            let tiendas = coreRutas[currentRouteKey].tiendas;
+
+            tiendas.forEach(t => {
+                if (query !== '' && !t.nombre.toLowerCase().includes(query)) return;
+                if (currentVisFilter === 'pending' && t.status !== 'amarillo') return;
+
+                let colorHex = t.status === 'amarillo' ? '#fbc02d' : (t.status === 'verde' ? '#388e3c' : (t.status === 'naranja' ? '#f57c00' : '#cc1e1e'));
+
+                let marker = L.circleMarker([t.lat, t.lon], {
+                    radius: 8, fillColor: colorHex, color: '#ffffff', weight: 2, opacity: 1, fillOpacity: 0.95
+                }).addTo(map);
+
+                marker.on('click', () => openStoreVisitForm(t.id));
+                markersArray.push(marker);
+
+                let bruto = t.precio || 0;
+                let merma = t.mermaDinero || 0;
+                let neto = bruto - merma;
+
+                let subLabel = t.status === 'amarillo' ? 'Pendiente' : (t.status === 'verde' ? `Neto: $${neto.toFixed(2)}` : (t.status === 'naranja' ? 'No dejó producto' : 'Incidencia'));
+                
+                let card = document.createElement('div');
+                card.className = 'store-row-card';
+                card.innerHTML = `
+                    <div class="store-info-side" onclick="map.setView([${t.lat}, ${t.lon}], 17); openStoreVisitForm(${t.id});">
+                        <span class="store-name-text">🏪 ${t.nombre}</span>
+                        <span class="store-desc-text">${subLabel}</span>
+                    </div>
+                    <div class="store-actions-side">
+                        <span class="status-dot dot-${t.status}"></span>
+                    </div>
+                `;
+                listBox.appendChild(card);
+            });
+
+            // Reajusta el encuadre del mapa automáticamente basándose exclusivamente en los puntos de las tiendas
+            if (markersArray.length > 0) {
+                let boundingGroup = new L.featureGroup(markersArray);
+                map.fitBounds(boundingGroup.getBounds());
+            }
+        }
+
+        function openStoreVisitForm(storeId) {
+            currentStoreId = storeId;
+            let t = coreRutas[currentRouteKey].tiendas.find(item => item.id === storeId);
+            document.getElementById('form-tienda-titulo').innerText = `Semáforo: ${t.nombre}`;
+            document.getElementById('field-status').value = t.status;
+            document.getElementById('field-producto').value = t.producto || '';
+            document.getElementById('field-precio').value = t.precio || '';
+            document.getElementById('field-merma-piezas').value = t.mermaPiezas || 0;
+            document.getElementById('field-merma-dinero').value = t.mermaDinero || 0;
+            
+            document.getElementById('form-registro-visita').style.display = 'block';
+            toggleFormInputs();
+            liveCalculateNeto();
+        }
+
+        function toggleFormInputs() {
+            let status = document.getElementById('field-status').value;
+            document.getElementById('extended-fields').style.display = (status === 'verde') ? 'block' : 'none';
+        }
+
+        function liveCalculateNeto() {
+            let bruto = parseFloat(document.getElementById('field-precio').value) || 0;
+            let merma = parseFloat(document.getElementById('field-merma-dinero').value) || 0;
+            let neto = bruto - merma;
+            document.getElementById('neto-live-preview').innerText = `Total Neto: $${neto.toFixed(2)}`;
+        }
+
+        function closeFormPanel() {
+            document.getElementById('form-registro-visita').style.display = 'none';
+            currentStoreId = null;
+        }
+
+        function saveStoreStatus() {
+            if (currentStoreId === null) return;
+            let idx = coreRutas[currentRouteKey].tiendas.findIndex(item => item.id === currentStoreId);
+            let stat = document.getElementById('field-status').value;
+            
+            coreRutas[currentRouteKey].tiendas[idx].status = stat;
+            
+            if(stat === 'verde') {
+                coreRutas[currentRouteKey].tiendas[idx].producto = document.getElementById('field-producto').value;
+                coreRutas[currentRouteKey].tiendas[idx].precio = parseFloat(document.getElementById('field-precio').value) || 0;
+                coreRutas[currentRouteKey].tiendas[idx].mermaPiezas = parseInt(document.getElementById('field-merma-piezas').value) || 0;
+                coreRutas[currentRouteKey].tiendas[idx].mermaDinero = parseFloat(document.getElementById('field-merma-dinero').value) || 0;
+            } else {
+                coreRutas[currentRouteKey].tiendas[idx].producto = '';
+                coreRutas[currentRouteKey].tiendas[idx].precio = 0;
+                coreRutas[currentRouteKey].tiendas[idx].mermaPiezas = 0;
+                coreRutas[currentRouteKey].tiendas[idx].mermaDinero = 0;
+            }
+
+            localStorage.setItem('kesaa_multiroute_db6', JSON.stringify(coreRutas));
+            closeFormPanel();
+            buildInteractiveRouteMap();
+        }
+
+        function saveNewRouteHeader() {
+            let name = document.getElementById('new-route-name').value.trim();
+            if(!name) { alert("Agrega un nombre descriptivo."); return; }
+            let key = "ruta_" + Date.now();
+            coreRutas[key] = { id: key, nombre: name, tiendas: [] };
+            localStorage.setItem('kesaa_multiroute_db6', JSON.stringify(coreRutas));
+            document.getElementById('new-route-name').value = '';
+            alert("Ruta Creada con éxito.");
+            openAdminSection();
+        }
+
+        function openAdminSection() {
+            switchMainView('view-admin-stores');
+            const selector = document.getElementById('admin-route-selector');
+            selector.innerHTML = '';
+
+            Object.values(coreRutas).forEach(ruta => {
+                let opt = document.createElement('option');
+                opt.value = ruta.id; opt.innerText = ruta.nombre;
+                selector.appendChild(opt);
+            });
+
+            if (!adminMap) {
+                setTimeout(() => {
+                    adminMap = L.map('admin-map-canvas').setView([19.522, -102.414], 14);
+                    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(adminMap);
+                    
+                    adminMap.on('click', function(e) {
+                        let lat = e.latlng.lat;
+                        let lon = e.latlng.lng;
+                        document.getElementById('add-store-lat').value = lat;
+                        document.getElementById('add-store-lon').value = lon;
+
+                        if (adminTempMarker) adminMap.removeLayer(adminTempMarker);
+                        adminTempMarker = L.marker([lat, lon]).addTo(adminMap).bindPopup("Ubicación Temporal").openPopup();
+                    });
+
+                    loadRouteStoresToAdminSection();
+                }, 200);
+            } else {
+                setTimeout(() => { adminMap.invalidateSize(); loadRouteStoresToAdminSection(); }, 200);
+            }
+        }
+
+        function loadRouteStoresToAdminSection() {
+            let rKey = document.getElementById('admin-route-selector').value;
+            const tbody = document.getElementById('admin-table-body');
+            tbody.innerHTML = '';
+
+            adminRouteMarkers.forEach(m => adminMap.removeLayer(m));
+            adminRouteMarkers = [];
+            if(adminTempMarker) { adminMap.removeLayer(adminTempMarker); adminTempMarker = null; }
+
+            if(!rKey || !coreRutas[rKey]) return;
+
+            let group = [];
+            coreRutas[rKey].tiendas.forEach(t => {
+                let tr = document.createElement('tr');
+                tr.innerHTML = `<td><b>${t.nombre}</b></td><td><button class="btn-delete-store" onclick="removeStoreFromRoute('${rKey}', ${t.id})">❌ Eliminar</button></td>`;
+                tbody.appendChild(tr);
+
+                let m = L.circleMarker([t.lat, t.lon], { radius: 6, fillColor: '#333', color: '#fff', fillOpacity: 0.8 }).addTo(adminMap).bindPopup(t.nombre);
+                adminRouteMarkers.push(m);
+                group.push([t.lat, t.lon]);
+            });
+
+            if (group.length > 0) adminMap.fitBounds(group);
+        }
+
+        function addStoreToActiveAdminRoute() {
+            let rKey = document.getElementById('admin-route-selector').value;
+            let name = document.getElementById('add-store-name').value.trim();
+            let lat = parseFloat(document.getElementById('add-store-lat').value);
+            let lon = parseFloat(document.getElementById('add-store-lon').value);
+
+            if(!name || isNaN(lat) || isNaN(lon)) { alert("Por favor selecciona un punto en el mapa y escribe un nombre."); return; }
+
+            coreRutas[rKey].tiendas.push({
+                id: Date.now(), nombre: name, lat: lat, lon: lon, status: 'amarillo', producto: '', precio: 0, mermaPiezas: 0, mermaDinero: 0
+            });
+
+            localStorage.setItem('kesaa_multiroute_db6', JSON.stringify(coreRutas));
+            
+            document.getElementById('add-store-name').value = '';
+            document.getElementById('add-store-lat').value = '';
+            document.getElementById('add-store-lon').value = '';
+            if(adminTempMarker) { adminMap.removeLayer(adminTempMarker); adminTempMarker = null; }
+
+            loadRouteStoresToAdminSection();
+        }
+
+        function removeStoreFromRoute(routeKey, storeId) {
+            coreRutas[routeKey].tiendas = coreRutas[routeKey].tiendas.filter(item => item.id !== storeId);
+            localStorage.setItem('kesaa_multiroute_db6', JSON.stringify(coreRutas));
+            loadRouteStoresToAdminSection();
+        }
+
+        window.onload = function() {
+            const opciones = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+            document.getElementById('live-date').innerText = new Date().toLocaleDateString('es-ES', opciones);
+            
+            document.getElementById("login-password").addEventListener("keyup", function(event) {
+                if (event.key === "Enter") { event.preventDefault(); evalLoginAccess(); }
+            });
+        };
+    </script>
 </body>
 </html>
